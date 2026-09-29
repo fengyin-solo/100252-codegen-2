@@ -26,5 +26,7 @@ from app.routers import fault as router_fault
 from app.routers import tool as router_tool
 from app.routers import regulation as router_regulation
 from app.routers import training as router_training
+from app.routers import certificate as router_certificate
+from app.routers import schedule as router_schedule
 
-ROUTERS = [router_interlock, router_trackcircuit, router_signal, router_pointmachine, router_cable, router_powersupply, router_atp, router_balise, router_axlecounter, router_dispatchcenter, router_maintenancewindow, router_relay, router_fuse, router_lightning, router_emergencyresp, router_testrecord, router_fault, router_tool, router_regulation, router_training]
+ROUTERS = [router_interlock, router_trackcircuit, router_signal, router_pointmachine, router_cable, router_powersupply, router_atp, router_balise, router_axlecounter, router_dispatchcenter, router_maintenancewindow, router_relay, router_fuse, router_lightning, router_emergencyresp, router_testrecord, router_fault, router_tool, router_regulation, router_training, router_certificate, router_schedule]

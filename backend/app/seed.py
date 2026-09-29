@@ -1,9 +1,201 @@
 """示例数据：每个模块给几条不同状态的记录，方便起服务后立刻看到内容。"""
 from __future__ import annotations
 
+from datetime import date, timedelta
 from typing import Any
 
+from app import qualification as q
+
+
+def _cert_seed_rows() -> list[dict[str, Any]]:
+    """资质台账演示数据：日期相对今天生成，确保各判定分支随时可复现。
+
+    覆盖：合格 / 临期（按专业阈值）/ 已过期 / 有效期缺失 / 类别不符 /
+    重复录入同一张证书（以最近一次为准）/ 无任何证书（缺失按不合格）。
+    """
+    today = date.today()
+
+    def iso(offset_days: int) -> str:
+        return (today + timedelta(days=offset_days)).isoformat()
+
+    # recorded_at 决定重复证书谁是“最近一次”；同员工同类别的旧条目应被折叠。
+    return [
+        # 张三：信号工证，200 天后到期 —— 合格（本专业）
+        {"id": 1, "employee_id": "E001", "employee_name": "张志强", "specialty": "信号",
+         "cert_category": "信号工证", "cert_no": "SG-2026-001", "issue_date": iso(-300),
+         "expire_date": iso(200), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2026-01-10T09:00:00"},
+        # 李四：信号工证，10 天后到期 —— 临期（信号阈值 30）
+        {"id": 2, "employee_id": "E002", "employee_name": "李婉婷", "specialty": "信号",
+         "cert_category": "信号工证", "cert_no": "SG-2026-002", "issue_date": iso(-500),
+         "expire_date": iso(10), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2026-01-11T09:00:00"},
+        # 王五：信号工证，5 天前已过期
+        {"id": 3, "employee_id": "E003", "employee_name": "王建国", "specialty": "信号",
+         "cert_category": "信号工证", "cert_no": "SG-2025-003", "issue_date": iso(-730),
+         "expire_date": iso(-5), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2025-01-09T09:00:00"},
+        # 赵磊：信号工证旧记录（已过期，重复录入）
+        {"id": 4, "employee_id": "E004", "employee_name": "赵磊", "specialty": "信号",
+         "cert_category": "信号工证", "cert_no": "SG-2024-004", "issue_date": iso(-730),
+         "expire_date": iso(-40), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2025-06-01T09:00:00"},
+        # 赵磊：同一张信号工证最近一次登记，300 天后到期 —— 以这条为准，合格
+        {"id": 5, "employee_id": "E004", "employee_name": "赵磊", "specialty": "信号",
+         "cert_category": "信号工证", "cert_no": "SG-2026-004", "issue_date": iso(-10),
+         "expire_date": iso(300), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2026-08-20T14:00:00"},
+        # 孙倩：低压电工证（电源），10 天后到期 —— 电源阈值 15，判临期
+        {"id": 6, "employee_id": "E005", "employee_name": "孙倩", "specialty": "电源",
+         "cert_category": "低压电工证", "cert_no": "DY-2026-005", "issue_date": iso(-350),
+         "expire_date": iso(10), "issued_by": "应急管理局",
+         "recorded_at": "2026-02-01T09:00:00"},
+        # 周凯：低压电工证，20 天后到期 —— 电源阈值 15，20>=15 合格
+        {"id": 7, "employee_id": "E006", "employee_name": "周凯", "specialty": "电源",
+         "cert_category": "低压电工证", "cert_no": "DY-2026-006", "issue_date": iso(-340),
+         "expire_date": iso(20), "issued_by": "应急管理局",
+         "recorded_at": "2026-02-02T09:00:00"},
+        # 吴敏：车载设备检修证，30 天后到期 —— 车载阈值 45，判临期
+        {"id": 8, "employee_id": "E007", "employee_name": "吴敏", "specialty": "车载",
+         "cert_category": "车载设备检修证", "cert_no": "CZ-2026-007", "issue_date": iso(-330),
+         "expire_date": iso(30), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2026-03-01T09:00:00"},
+        # 郑昊：区间设备检修证，100 天后到期 —— 合格（可作为信号专业的允许兼岗）
+        {"id": 9, "employee_id": "E008", "employee_name": "郑昊", "specialty": "区间",
+         "cert_category": "区间设备检修证", "cert_no": "QJ-2026-008", "issue_date": iso(-200),
+         "expire_date": iso(100), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2026-03-02T09:00:00"},
+        # 冯雪：信号工证，100 天后到期 —— 信号专业，若派去做车载ATP即“超范围兼岗”
+        {"id": 10, "employee_id": "E009", "employee_name": "冯雪", "specialty": "信号",
+         "cert_category": "信号工证", "cert_no": "SG-2026-009", "issue_date": iso(-200),
+         "expire_date": iso(100), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2026-03-03T09:00:00"},
+        # 陈勇：驼峰设备检修证，但有效期字段缺失 —— 按不合格（缺失）处理，不放行
+        {"id": 11, "employee_id": "E010", "employee_name": "陈勇", "specialty": "驼峰",
+         "cert_category": "驼峰设备检修证", "cert_no": "TF-2026-010", "issue_date": iso(-100),
+         "expire_date": None, "issued_by": "集团职业鉴定站",
+         "recorded_at": "2026-03-04T09:00:00"},
+        # 高原：只持通用安全合格证（信号），若派去做“站内信号设备检修”（要求信号工证）——类别不符
+        {"id": 12, "employee_id": "E011", "employee_name": "高原", "specialty": "信号",
+         "cert_category": "通用安全合格证", "cert_no": "AQ-2026-011", "issue_date": iso(-50),
+         "expire_date": iso(300), "issued_by": "安全监察室",
+         "recorded_at": "2026-03-05T09:00:00"},
+        # E012 林涛：信号工证，100 天后到期（用于历史排班：已保存，证书现已过期场景由下面的历史单覆盖）
+        {"id": 13, "employee_id": "E012", "employee_name": "林涛", "specialty": "信号",
+         "cert_category": "信号工证", "cert_no": "SG-2025-012", "issue_date": iso(-720),
+         "expire_date": iso(-15), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2025-02-01T09:00:00"},
+        # 许晴：高铁信号工证，100 天后到期 —— 合格
+        {"id": 14, "employee_id": "E013", "employee_name": "许晴", "specialty": "信号",
+         "cert_category": "高铁信号工证", "cert_no": "GT-2026-013", "issue_date": iso(-100),
+         "expire_date": iso(100), "issued_by": "集团职业鉴定站",
+         "recorded_at": "2026-03-06T09:00:00"},
+        # E014 郭威：不录入任何证书 —— 资质缺失，按不合格
+    ]
+
+
+def _employee_seed_rows() -> list[dict[str, Any]]:
+    return [
+        {"id": 1, "employee_id": "E001", "name": "张志强", "specialty": "信号", "team": "信号一工班"},
+        {"id": 2, "employee_id": "E002", "name": "李婉婷", "specialty": "信号", "team": "信号一工班"},
+        {"id": 3, "employee_id": "E003", "name": "王建国", "specialty": "信号", "team": "信号二工班"},
+        {"id": 4, "employee_id": "E004", "name": "赵磊", "specialty": "信号", "team": "信号二工班"},
+        {"id": 5, "employee_id": "E005", "name": "孙倩", "specialty": "电源", "team": "电源工班"},
+        {"id": 6, "employee_id": "E006", "name": "周凯", "specialty": "电源", "team": "电源工班"},
+        {"id": 7, "employee_id": "E007", "name": "吴敏", "specialty": "车载", "team": "车载工班"},
+        {"id": 8, "employee_id": "E008", "name": "郑昊", "specialty": "区间", "team": "区间工班"},
+        {"id": 9, "employee_id": "E009", "name": "冯雪", "specialty": "信号", "team": "信号一工班"},
+        {"id": 10, "employee_id": "E010", "name": "陈勇", "specialty": "驼峰", "team": "驼峰工班"},
+        {"id": 11, "employee_id": "E011", "name": "高原", "specialty": "信号", "team": "信号二工班"},
+        {"id": 12, "employee_id": "E012", "name": "林涛", "specialty": "信号", "team": "信号一工班"},
+        {"id": 13, "employee_id": "E013", "name": "许晴", "specialty": "信号", "team": "高铁工班"},
+        {"id": 14, "employee_id": "E014", "name": "郭威", "specialty": "信号", "team": "信号二工班"},
+    ]
+
+
+def _schedule_seed_rows() -> list[dict[str, Any]]:
+    """历史检修排班：用新口径在启动时重算结论，但审核记录原样保留。
+
+    结论字段（qualified/qualification/days_left/scope 等）允许被重算覆盖；
+    audits 是只追加的审核留痕，任何刷新/重算都不动它。
+    """
+    today = date.today()
+
+    def iso(offset_days: int) -> str:
+        return (today + timedelta(days=offset_days)).isoformat()
+
+    return [
+        {
+            "id": 1, "schedule_no": "SCH-0001", "employee_id": "E001", "employee_name": "张志强",
+            "specialty": "信号", "work_item": "站内信号设备检修", "work_date": iso(3),
+            "shift": "白班", "secondary_reason": None,
+            "status": "已审核", "abnormal": False,
+            # 历史时刻曾判定合格的留痕（重算后若仍合格则结论不变）
+            "audits": [
+                {"at": (today + timedelta(days=-2)).isoformat() + "T08:00:00",
+                 "action": "保存排班", "reviewer": "值班管理员",
+                 "qualification_snapshot": "合格", "days_left_snapshot": 202,
+                 "scope_snapshot": "本专业", "note": "资质合格，准入排班"},
+                {"at": (today + timedelta(days=-2)).isoformat() + "T08:05:00",
+                 "action": "审核通过", "reviewer": "工班长",
+                 "qualification_snapshot": "合格", "days_left_snapshot": 202,
+                 "scope_snapshot": "本专业", "note": "同意"},
+            ],
+        },
+        {
+            # 林涛证书现已过期：历史已审核通过，重算后当前结论变“已过期”，
+            # 但 audits 里的原始审核记录必须保留。
+            "id": 2, "schedule_no": "SCH-0002", "employee_id": "E012", "employee_name": "林涛",
+            "specialty": "信号", "work_item": "站内信号设备检修", "work_date": iso(1),
+            "shift": "夜班", "secondary_reason": None,
+            "status": "已审核", "abnormal": False,
+            "audits": [
+                {"at": (today + timedelta(days=-200)).isoformat() + "T08:00:00",
+                 "action": "审核通过", "reviewer": "工班长",
+                 "qualification_snapshot": "合格", "days_left_snapshot": 185,
+                 "scope_snapshot": "本专业",
+                 "note": "当时证书有效，同意排班（历史审核记录不因证书过期而删除）"},
+            ],
+        },
+        {
+            # 超范围兼岗但写明了理由并经批准的历史单：信号工冯雪去做车载ATP
+            "id": 3, "schedule_no": "SCH-0003", "employee_id": "E009", "employee_name": "冯雪",
+            "specialty": "信号", "work_item": "车载ATP检修", "work_date": iso(5),
+            "shift": "白班",
+            "secondary_reason": "车载工班两名持证人员同时外派，临时支援配合，仅限本次不下车底带电作业。",
+            "status": "已审核", "abnormal": True,
+            "audits": [
+                {"at": (today + timedelta(days=-1)).isoformat() + "T09:00:00",
+                 "action": "保存排班", "reviewer": "值班管理员",
+                 "qualification_snapshot": "合格", "days_left_snapshot": 101,
+                 "scope_snapshot": "超范围兼岗",
+                 "note": "超出允许兼岗范围，已登记理由并报工班长审批"},
+                {"at": (today + timedelta(days=-1)).isoformat() + "T09:20:00",
+                 "action": "审核通过", "reviewer": "工班长",
+                 "qualification_snapshot": "合格", "days_left_snapshot": 101,
+                 "scope_snapshot": "超范围兼岗", "note": "同意临时支援，限本次"},
+            ],
+        },
+        {
+            # 李四证书临期（10 天 < 30）：历史单当前结论应为“临期”，异常需重标
+            "id": 4, "schedule_no": "SCH-0004", "employee_id": "E002", "employee_name": "李婉婷",
+            "specialty": "信号", "work_item": "站内信号设备检修", "work_date": iso(2),
+            "shift": "白班", "secondary_reason": None,
+            "status": "待审核", "abnormal": False,
+            "audits": [
+                {"at": (today + timedelta(days=-1)).isoformat() + "T10:00:00",
+                 "action": "保存排班", "reviewer": "值班管理员",
+                 "qualification_snapshot": "合格", "days_left_snapshot": 11,
+                 "scope_snapshot": "本专业", "note": "初版按旧口径保存"},
+            ],
+        },
+    ]
+
+
 SEED_ROWS: dict[str, list[dict[str, Any]]] = {
+    "employee": _employee_seed_rows(),
+    "certificate": _cert_seed_rows(),
+    "schedule": _schedule_seed_rows(),
     "interlock": [{'id': 1,
   'status': '正常',
   'pending': True,

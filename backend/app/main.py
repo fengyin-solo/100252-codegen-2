@@ -26,6 +26,13 @@ for module in ROUTERS:
     app.include_router(module.router)
 
 
+@app.on_event("startup")
+def rebaseline_history() -> None:
+    """启动即按最新判定口径把历史排班重新标一遍；审核记录不改动。"""
+    from app.services.schedule import ScheduleService
+    ScheduleService().reassess_history()
+
+
 @app.get("/api/health")
 def health() -> dict[str, object]:
     """健康检查：确认服务已经监听、示例数据已经就绪。"""

@@ -28,6 +28,36 @@ class EntryPayload(BaseModel):
     remark: str | None = None
 
 
+class CertificatePayload(BaseModel):
+    """资质台账：登记一张持证记录。有效期缺失按不合格处理，因此必填。"""
+
+    employee_id: str
+    cert_category: str
+    expire_date: str
+    cert_no: str | None = None
+    issue_date: str | None = None
+    issued_by: str | None = None
+    recorded_at: str | None = None
+
+
+class SchedulePayload(BaseModel):
+    """检修排班：保存一条派工。超范围兼岗时 secondary_reason 必填。"""
+
+    employee_id: str
+    work_item: str
+    work_date: str
+    shift: str | None = "白班"
+    secondary_reason: str | None = None
+    reviewer: str | None = None
+
+
+class ScheduleCheckPayload(BaseModel):
+    """排班保存前的资格预校验（不落库）。"""
+
+    employee_id: str
+    work_item: str
+
+
 
 class InterlockEntry(BaseModel):
     """联锁道岔明细结构。"""
