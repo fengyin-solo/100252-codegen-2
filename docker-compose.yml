@@ -5,6 +5,8 @@ services:
       - "8000:8000"
     environment:
       - APP_ENV=local
+      # 可选：固定资质判定的业务日期，便于演示到期天数
+      # - QUALIFICATION_TODAY=2026-09-29
   frontend:
     build: ./frontend
     ports:

@@ -10,9 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.routers import ROUTERS
+from app.services.remark import remark_all
 from app.store import store
 
 app = FastAPI(title="轨道交通信号检修管理平台", version="1.0.0")
+
+
+@app.on_event("startup")
+def remark_history_on_startup() -> None:
+    """启动即按当前资质口径把历史数据重标一遍；审核记录原样保留。"""
+    store.remark_summary = remark_all()
 
 app.add_middleware(
     CORSMiddleware,

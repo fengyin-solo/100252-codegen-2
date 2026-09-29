@@ -21,6 +21,8 @@ const Fault = () => import('@/views/fault/index.vue')
 const Tool = () => import('@/views/tool/index.vue')
 const Regulation = () => import('@/views/regulation/index.vue')
 const Training = () => import('@/views/training/index.vue')
+const Qualification = () => import('@/views/qualification/index.vue')
+const Schedule = () => import('@/views/schedule/index.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -46,6 +48,8 @@ const router = createRouter({
     { path: '/tool', name: 'tool', component: Tool },
     { path: '/regulation', name: 'regulation', component: Regulation },
     { path: '/training', name: 'training', component: Training },
+    { path: '/qualification', name: 'qualification', component: Qualification },
+    { path: '/schedule', name: 'schedule', component: Schedule },
   ],
 })
 
